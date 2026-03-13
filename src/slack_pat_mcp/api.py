@@ -1,5 +1,6 @@
 """Slack Web API wrapper using user token with form-encoded POST."""
 
+import json
 import time
 
 import requests
@@ -102,3 +103,40 @@ def users_profile(user: str) -> dict:
 def usergroups_list() -> dict:
     """List all user groups in the workspace."""
     return _post("usergroups.list", {"include_users": "true"})
+
+
+def files_list(channel: str = "", cursor: str = "", limit: int = 20) -> dict:
+    """List files in workspace or channel."""
+    data = {"count": limit}
+    if channel:
+        data["channel"] = channel
+    if cursor:
+        data["cursor"] = cursor
+    return _post("files.list", data)
+
+
+def files_info(file_id: str) -> dict:
+    """Get info about a file."""
+    return _post("files.info", {"file": file_id})
+
+
+def files_delete(file_id: str) -> dict:
+    """Delete a file."""
+    return _post("files.delete", {"file": file_id})
+
+
+def files_upload(channel: str, content: str, filename: str = "file.txt", title: str = "") -> dict:
+    """Upload text content as a file using v2 upload flow."""
+    content_bytes = content.encode("utf-8")
+    # Step 1: Get upload URL
+    url_resp = _post("files.getUploadURLExternal", {"filename": filename, "length": len(content_bytes)})
+    upload_url = url_resp["upload_url"]
+    file_id = url_resp["file_id"]
+    # Step 2: Upload content to URL
+    requests.post(upload_url, data=content_bytes, headers={"Content-Type": "application/octet-stream"}, timeout=30)
+    # Step 3: Complete upload
+    files_data = json.dumps([{"id": file_id, "title": title or filename}])
+    data = {"files": files_data}
+    if channel:
+        data["channel_id"] = channel
+    return _post("files.completeUploadExternal", data)

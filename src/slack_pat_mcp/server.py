@@ -56,6 +56,24 @@ TOOLS = [
         }
     },
     {
+        "name": "slack_files",
+        "description": "File operations. Actions: list, info, upload, delete",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "info", "upload", "delete"]},
+                "channel": {"type": "string", "description": "Channel ID (for list/upload)"},
+                "file_id": {"type": "string", "description": "File ID (for info/delete)"},
+                "content": {"type": "string", "description": "Text content to upload (for upload)"},
+                "filename": {"type": "string", "default": "file.txt", "description": "Filename (for upload)"},
+                "title": {"type": "string", "description": "File title (for upload)"},
+                "cursor": {"type": "string", "description": "Pagination cursor"},
+                "limit": {"type": "integer", "default": 20},
+            },
+            "required": ["action"]
+        }
+    },
+    {
         "name": "slack_users",
         "description": "User operations. Actions: list, info, profile, usergroups",
         "inputSchema": {
@@ -90,6 +108,20 @@ def _condense_message(msg):
         "reactions": msg.get("reactions"),
         "reply_count": msg.get("reply_count"),
         "thread_ts": msg.get("thread_ts"),
+    }
+
+
+def _condense_file(f):
+    return {
+        "id": f.get("id"),
+        "name": f.get("name"),
+        "title": f.get("title"),
+        "filetype": f.get("filetype"),
+        "size": f.get("size"),
+        "user": f.get("user"),
+        "channels": f.get("channels", []),
+        "url_private": f.get("url_private"),
+        "created": f.get("created"),
     }
 
 
@@ -165,6 +197,23 @@ def handle_chat(args):
     return {"error": f"Unknown action: {action}"}
 
 
+def handle_files(args):
+    action = args["action"]
+    if action == "list":
+        data = api.files_list(args.get("channel", ""), args.get("cursor", ""), args.get("limit", 20))
+        files = [_condense_file(f) for f in data.get("files", [])]
+        paging = data.get("paging", {})
+        return {"files": files, "paging": paging}
+    if action == "info":
+        return _condense_file(api.files_info(args["file_id"]).get("file", {}))
+    if action == "upload":
+        return api.files_upload(args.get("channel", ""), args["content"], args.get("filename", "file.txt"), args.get("title", ""))
+    if action == "delete":
+        api.files_delete(args["file_id"])
+        return {"success": True}
+    return {"error": f"Unknown action: {action}"}
+
+
 def handle_users(args):
     action = args["action"]
     if action == "list":
@@ -187,6 +236,8 @@ def handle_tool(name, args):
             return handle_channel(args)
         if name == "slack_chat":
             return handle_chat(args)
+        if name == "slack_files":
+            return handle_files(args)
         if name == "slack_search":
             return api.search_messages(args["query"], args.get("sort", "timestamp"), args.get("cursor", ""), args.get("count", 20))
         if name == "slack_users":
