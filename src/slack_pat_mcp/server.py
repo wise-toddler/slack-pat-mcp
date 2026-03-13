@@ -262,7 +262,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.0"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.1"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
