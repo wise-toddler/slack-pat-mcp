@@ -100,6 +100,11 @@ def users_profile(user: str) -> dict:
     return _post("users.profile.get", {"user": user})
 
 
+def users_profile_set(profile: dict) -> dict:
+    """Set the authenticated user's profile (status, etc)."""
+    return _post("users.profile.set", {"profile": json.dumps(profile)})
+
+
 def usergroups_list() -> dict:
     """List all user groups in the workspace."""
     return _post("usergroups.list", {"include_users": "true"})

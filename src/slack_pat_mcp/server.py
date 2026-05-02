@@ -79,8 +79,11 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "enum": ["list", "info", "profile", "usergroups"]},
+                "action": {"type": "string", "enum": ["list", "info", "profile", "usergroups", "set_status"]},
                 "user_id": {"type": "string", "description": "User ID (for info/profile)"},
+                "status_text": {"type": "string", "description": "Status message (for set_status)"},
+                "status_emoji": {"type": "string", "description": "Status emoji e.g. :coffee: (for set_status)"},
+                "status_expiration": {"type": "integer", "default": 0, "description": "Unix timestamp when status expires, 0=no expiry (for set_status)"},
                 "cursor": {"type": "string", "description": "Pagination cursor"},
                 "limit": {"type": "integer", "default": 100},
             },
@@ -227,6 +230,13 @@ def handle_users(args):
         return api.users_profile(args["user_id"])
     if action == "usergroups":
         return api.usergroups_list()
+    if action == "set_status":
+        profile = {
+            "status_text": args.get("status_text", ""),
+            "status_emoji": args.get("status_emoji", ""),
+            "status_expiration": args.get("status_expiration", 0),
+        }
+        return api.users_profile_set(profile)
     return {"error": f"Unknown action: {action}"}
 
 
@@ -262,7 +272,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.1"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.2"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
