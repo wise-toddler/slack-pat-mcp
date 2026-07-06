@@ -1,5 +1,6 @@
 """Slack PAT MCP Server."""
 import json
+import re
 import sys
 from . import api
 
@@ -103,11 +104,19 @@ def _condense_channel(ch):
     }
 
 
+def _resolve_mentions(text):
+    """Replace <@U...> with <@U...> (display_name)."""
+    if not text:
+        return text
+    _ensure_user_cache()
+    return re.sub(r"<@(U[A-Z0-9]+)>", lambda m: f"<@{m.group(1)}> ({_user_cache.get(m.group(1), m.group(1))})", text)
+
+
 def _condense_message(msg):
     return {
         "ts": msg.get("ts"),
         "user": msg.get("user"),
-        "text": msg.get("text"),
+        "text": _resolve_mentions(msg.get("text")),
         "reactions": msg.get("reactions"),
         "reply_count": msg.get("reply_count"),
         "thread_ts": msg.get("thread_ts"),
@@ -272,7 +281,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.2"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.3"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
