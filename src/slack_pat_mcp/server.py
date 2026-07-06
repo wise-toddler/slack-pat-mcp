@@ -152,10 +152,15 @@ def _ensure_user_cache():
     global _user_cache
     if _user_cache:
         return
-    result = api.users_list(limit=200)
-    for u in result.get("members", []):
-        p = u.get("profile", {})
-        _user_cache[u["id"]] = p.get("display_name") or u.get("real_name") or u.get("name", "")
+    cursor = ""
+    while True:
+        result = api.users_list(cursor, limit=200)
+        for u in result.get("members", []):
+            p = u.get("profile", {})
+            _user_cache[u["id"]] = p.get("display_name") or u.get("real_name") or u.get("name", "")
+        cursor = result.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
+            break
 
 
 def _paginated(data, key):
@@ -281,7 +286,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.3"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.4"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
