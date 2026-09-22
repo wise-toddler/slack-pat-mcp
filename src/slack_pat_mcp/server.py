@@ -28,7 +28,7 @@ TOOLS = [
     },
     {
         "name": "slack_chat",
-        "description": "Send, edit, delete messages and react. Actions: post, update, delete, react_add, react_remove",
+        "description": "Send, edit, delete messages and react. Actions: post, update, delete, react_add, react_remove. To READ threads use slack_channel action=thread",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -193,7 +193,7 @@ def handle_channel(args):
         return r
     if action == "open_dm":
         return api.conversations_open(args["users"])
-    return {"error": f"Unknown action: {action}"}
+    return {"error": f"Unknown action: {action}. Valid: list, list_dms, history, thread, open_dm"}
 
 
 def handle_chat(args):
@@ -211,7 +211,7 @@ def handle_chat(args):
     if action == "react_remove":
         api.reactions_remove(args["channel"], args["ts"], args["emoji"])
         return {"success": True}
-    return {"error": f"Unknown action: {action}"}
+    return {"error": f"Unknown action: {action}. Valid: post, update, delete, react_add, react_remove. To read threads use slack_channel action=thread"}
 
 
 def handle_files(args):
@@ -228,7 +228,7 @@ def handle_files(args):
     if action == "delete":
         api.files_delete(args["file_id"])
         return {"success": True}
-    return {"error": f"Unknown action: {action}"}
+    return {"error": f"Unknown action: {action}. Valid: list, info, upload, delete"}
 
 
 def handle_users(args):
@@ -251,7 +251,7 @@ def handle_users(args):
             "status_expiration": args.get("status_expiration", 0),
         }
         return api.users_profile_set(profile)
-    return {"error": f"Unknown action: {action}"}
+    return {"error": f"Unknown action: {action}. Valid: list, info, profile, usergroups, set_status"}
 
 
 def handle_tool(name, args):
@@ -267,6 +267,8 @@ def handle_tool(name, args):
         if name == "slack_users":
             return handle_users(args)
         return {"error": f"Unknown tool: {name}"}
+    except KeyError as e:
+        return {"error": f"Missing required argument: {e}"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -286,7 +288,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.4"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.5"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
