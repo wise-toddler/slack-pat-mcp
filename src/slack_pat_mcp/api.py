@@ -2,21 +2,22 @@
 
 import json
 import time
+import uuid
 
 import requests
 
-from .config import HEADERS
+from .config import D_COOKIE, HEADERS, SESSION_HEADERS, XOXC_TOKEN
 
 BASE = "https://slack.com/api"
 
 
-def _post(method: str, data: dict) -> dict:
+def _post(method: str, data: dict, headers: dict = HEADERS) -> dict:
     """POST to Slack API, retry once on 429, check response ok."""
-    resp = requests.post(f"{BASE}/{method}", headers=HEADERS, data=data, timeout=30)
+    resp = requests.post(f"{BASE}/{method}", headers=headers, data=data, timeout=30)
     if resp.status_code == 429:
         wait = int(resp.headers.get("Retry-After", 1))
         time.sleep(wait)
-        resp = requests.post(f"{BASE}/{method}", headers=HEADERS, data=data, timeout=30)
+        resp = requests.post(f"{BASE}/{method}", headers=headers, data=data, timeout=30)
     resp.raise_for_status()
     body = resp.json()
     if not body.get("ok"):
@@ -145,3 +146,73 @@ def files_upload(channel: str, content: str, filename: str = "file.txt", title: 
     if channel:
         data["channel_id"] = channel
     return _post("files.completeUploadExternal", data)
+
+
+def _session_post(method: str, data: dict) -> dict:
+    """POST with browser session keys, required by the internal drafts API."""
+    if not (XOXC_TOKEN and D_COOKIE):
+        raise RuntimeError("drafts need SLACK_XOXC_TOKEN and SLACK_D_COOKIE (browser session) env vars")
+    return _post(method, data, SESSION_HEADERS)
+
+
+def _rich_text(text: str) -> str:
+    """Wrap plain text in a single rich_text block (drafts don't take mrkdwn)."""
+    return json.dumps([{"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": text}]}]}])
+
+
+def _destination(channel: str, thread_ts: str = "") -> str:
+    """Build the single-destination list drafts expect."""
+    dest = {"channel_id": channel}
+    if thread_ts:
+        dest["thread_ts"] = thread_ts
+    return json.dumps([dest])
+
+
+def _padded_ts(ts: str) -> str:
+    """Pad ts to 7 decimals; 6-decimal values fail with draft_has_conflict."""
+    sec, _, frac = ts.partition(".")
+    return f"{sec}.{frac.ljust(7, '0')}"
+
+
+def drafts_list() -> dict:
+    """List the user's drafts (includes sent/deleted ones)."""
+    return _session_post("drafts.list", {})
+
+
+def _get_draft(draft_id: str) -> dict:
+    """Find one draft by ID via drafts.list."""
+    for d in drafts_list().get("drafts", []):
+        if d["id"] == draft_id:
+            return d
+    raise RuntimeError(f"draft not found: {draft_id}")
+
+
+def drafts_create(channel: str, text: str, thread_ts: str = "") -> dict:
+    """Create a draft in a channel/DM or thread."""
+    return _session_post("drafts.create", {
+        "blocks": _rich_text(text),
+        "destinations": _destination(channel, thread_ts),
+        "client_msg_id": str(uuid.uuid4()),
+        "file_ids": "[]",
+        "is_from_composer": "true",
+    })
+
+
+def drafts_update(draft_id: str, text: str) -> dict:
+    """Replace a draft's text, keeping its destination."""
+    d = _get_draft(draft_id)
+    dest = d["destinations"][0]
+    return _session_post("drafts.update", {
+        "draft_id": draft_id,
+        "client_last_updated_ts": _padded_ts(d["last_updated_ts"]),
+        "blocks": _rich_text(text),
+        "destinations": _destination(dest["channel_id"], dest.get("thread_ts", "")),
+        "file_ids": "[]",
+        "is_from_composer": "true",
+    })
+
+
+def drafts_delete(draft_id: str) -> dict:
+    """Delete a draft."""
+    d = _get_draft(draft_id)
+    return _session_post("drafts.delete", {"draft_id": draft_id, "client_last_updated_ts": _padded_ts(d["last_updated_ts"])})

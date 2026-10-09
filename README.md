@@ -26,7 +26,17 @@ uvx slack-pat-mcp
 - **slack_channel** — list, list_dms, history, thread, open_dm
 - **slack_chat** — post, update, delete, react_add, react_remove
 - **slack_search** — search messages with Slack syntax
-- **slack_users** — list, info, profile, usergroups
+- **slack_users** — list, info, profile, usergroups, set_status
+- **slack_drafts** — create, list, update, delete (needs browser session keys below)
+
+## Drafts (optional)
+
+Slack's drafts API rejects xoxp tokens, so drafts use your browser session. In `app.slack.com` DevTools:
+
+- `SLACK_XOXC_TOKEN` — Console: `Object.values(JSON.parse(localStorage.localConfig_v2).teams).map(t => [t.name, t.token])`
+- `SLACK_D_COOKIE` — Application → Cookies → `https://app.slack.com` → `d` (copy as-is, URL-encoded)
+
+These are unofficial and stop working when you sign out of Slack in that browser.
 
 ## Required Slack OAuth Scopes (User Token)
 

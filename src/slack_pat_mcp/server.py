@@ -28,7 +28,7 @@ TOOLS = [
     },
     {
         "name": "slack_chat",
-        "description": "Send, edit, delete messages and react. Actions: post, update, delete, react_add, react_remove. To READ threads use slack_channel action=thread",
+        "description": "Send, edit, delete messages and react. Actions: post, update, delete, react_add, react_remove. To READ threads use slack_channel action=thread. To save without sending use slack_drafts",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -91,6 +91,21 @@ TOOLS = [
             "required": ["action"]
         }
     },
+    {
+        "name": "slack_drafts",
+        "description": "Drafts saved in your Slack Drafts (not sent). Actions: create, list, update, delete. Plain text only. One draft per channel/thread (self-DM allows many): on attached_draft_exists, list and update the existing one",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["create", "list", "update", "delete"]},
+                "channel": {"type": "string", "description": "Channel/DM ID C.../D.../G... (for create)"},
+                "text": {"type": "string", "description": "Draft text (for create/update)"},
+                "thread_ts": {"type": "string", "description": "Draft a thread reply (for create)"},
+                "draft_id": {"type": "string", "description": "Draft ID Dr... (for update/delete)"},
+            },
+            "required": ["action"]
+        }
+    },
 ]
 
 
@@ -121,6 +136,13 @@ def _condense_message(msg):
         "reply_count": msg.get("reply_count"),
         "thread_ts": msg.get("thread_ts"),
     }
+
+
+def _condense_draft(d):
+    dest = (d.get("destinations") or [{}])[0]
+    # ponytail: flattens top-level rich_text_section text only; lists/quotes/mentions dropped
+    text = "".join(e.get("text", "") for b in d.get("blocks", []) for s in b.get("elements", []) for e in s.get("elements", []))
+    return {"id": d.get("id"), "channel": dest.get("channel_id"), "thread_ts": dest.get("thread_ts"), "text": text}
 
 
 def _condense_file(f):
@@ -254,6 +276,21 @@ def handle_users(args):
     return {"error": f"Unknown action: {action}. Valid: list, info, profile, usergroups, set_status"}
 
 
+def handle_drafts(args):
+    action = args["action"]
+    if action == "create":
+        return _condense_draft(api.drafts_create(args["channel"], args["text"], args.get("thread_ts", ""))["draft"])
+    if action == "list":
+        drafts = api.drafts_list().get("drafts", [])
+        return {"drafts": [_condense_draft(d) for d in drafts if not d.get("is_deleted") and not d.get("is_sent")]}
+    if action == "update":
+        return _condense_draft(api.drafts_update(args["draft_id"], args["text"])["draft"])
+    if action == "delete":
+        api.drafts_delete(args["draft_id"])
+        return {"success": True}
+    return {"error": f"Unknown action: {action}. Valid: create, list, update, delete"}
+
+
 def handle_tool(name, args):
     try:
         if name == "slack_channel":
@@ -266,6 +303,8 @@ def handle_tool(name, args):
             return api.search_messages(args["query"], args.get("sort", "timestamp"), args.get("cursor", ""), args.get("count", 20))
         if name == "slack_users":
             return handle_users(args)
+        if name == "slack_drafts":
+            return handle_drafts(args)
         return {"error": f"Unknown tool: {name}"}
     except KeyError as e:
         return {"error": f"Missing required argument: {e}"}
@@ -288,7 +327,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.5"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.6"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}

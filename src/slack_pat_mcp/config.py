@@ -9,3 +9,13 @@ HEADERS = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/x-www-form-urlencoded",
 }
+
+# Browser session keys: Slack's internal drafts API rejects xoxp tokens (not_allowed_token_type)
+XOXC_TOKEN = os.environ.get("SLACK_XOXC_TOKEN", "")
+D_COOKIE = os.environ.get("SLACK_D_COOKIE", "")
+
+SESSION_HEADERS = {
+    "Authorization": f"Bearer {XOXC_TOKEN}",
+    "Cookie": f"d={D_COOKIE}",
+    "Content-Type": "application/x-www-form-urlencoded",
+}
