@@ -3,6 +3,7 @@ import json
 import re
 import sys
 from . import api
+from .richtext import to_text
 
 _user_cache = {}
 
@@ -93,13 +94,13 @@ TOOLS = [
     },
     {
         "name": "slack_drafts",
-        "description": "Drafts saved in your Slack Drafts (not sent). Actions: create, list, update, delete. Plain text only. One draft per channel/thread (self-DM allows many): on attached_draft_exists, list and update the existing one",
+        "description": "Drafts saved in your Slack Drafts (not sent). Actions: create, list, update, delete. text is Slack mrkdwn like slack_chat post: *bold* _italic_ ~strike~ `code`, ```code blocks```, > quotes, lines starting with •/-/* or 1. become lists, <url|label>, <@U...>, :emoji:. One draft per channel/thread (self-DM allows many): on attached_draft_exists, list and update the existing one",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "action": {"type": "string", "enum": ["create", "list", "update", "delete"]},
                 "channel": {"type": "string", "description": "Channel/DM ID C.../D.../G... (for create)"},
-                "text": {"type": "string", "description": "Draft text (for create/update)"},
+                "text": {"type": "string", "description": "Draft text in Slack mrkdwn (for create/update)"},
                 "thread_ts": {"type": "string", "description": "Draft a thread reply (for create)"},
                 "draft_id": {"type": "string", "description": "Draft ID Dr... (for update/delete)"},
             },
@@ -140,9 +141,7 @@ def _condense_message(msg):
 
 def _condense_draft(d):
     dest = (d.get("destinations") or [{}])[0]
-    # ponytail: flattens top-level rich_text_section text only; lists/quotes/mentions dropped
-    text = "".join(e.get("text", "") for b in d.get("blocks", []) for s in b.get("elements", []) for e in s.get("elements", []))
-    return {"id": d.get("id"), "channel": dest.get("channel_id"), "thread_ts": dest.get("thread_ts"), "text": text}
+    return {"id": d.get("id"), "channel": dest.get("channel_id"), "thread_ts": dest.get("thread_ts"), "text": to_text(d.get("blocks", []))}
 
 
 def _condense_file(f):
@@ -327,7 +326,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.6"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.7"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}

@@ -27,7 +27,7 @@ uvx slack-pat-mcp
 - **slack_chat** — post, update, delete, react_add, react_remove
 - **slack_search** — search messages with Slack syntax
 - **slack_users** — list, info, profile, usergroups, set_status
-- **slack_drafts** — create, list, update, delete (needs browser session keys below)
+- **slack_drafts** — create, list, update, delete; text is Slack mrkdwn (bold/italic/strike/code, lists, quotes, code blocks, links, mentions, emoji), converted to rich_text (needs browser session keys below)
 
 ## Drafts (optional)
 

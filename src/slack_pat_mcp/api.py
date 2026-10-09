@@ -7,6 +7,7 @@ import uuid
 import requests
 
 from .config import D_COOKIE, HEADERS, SESSION_HEADERS, XOXC_TOKEN
+from .richtext import to_blocks
 
 BASE = "https://slack.com/api"
 
@@ -155,11 +156,6 @@ def _session_post(method: str, data: dict) -> dict:
     return _post(method, data, SESSION_HEADERS)
 
 
-def _rich_text(text: str) -> str:
-    """Wrap plain text in a single rich_text block (drafts don't take mrkdwn)."""
-    return json.dumps([{"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": text}]}]}])
-
-
 def _destination(channel: str, thread_ts: str = "") -> str:
     """Build the single-destination list drafts expect."""
     dest = {"channel_id": channel}
@@ -190,7 +186,7 @@ def _get_draft(draft_id: str) -> dict:
 def drafts_create(channel: str, text: str, thread_ts: str = "") -> dict:
     """Create a draft in a channel/DM or thread."""
     return _session_post("drafts.create", {
-        "blocks": _rich_text(text),
+        "blocks": json.dumps(to_blocks(text)),
         "destinations": _destination(channel, thread_ts),
         "client_msg_id": str(uuid.uuid4()),
         "file_ids": "[]",
@@ -205,7 +201,7 @@ def drafts_update(draft_id: str, text: str) -> dict:
     return _session_post("drafts.update", {
         "draft_id": draft_id,
         "client_last_updated_ts": _padded_ts(d["last_updated_ts"]),
-        "blocks": _rich_text(text),
+        "blocks": json.dumps(to_blocks(text)),
         "destinations": _destination(dest["channel_id"], dest.get("thread_ts", "")),
         "file_ids": "[]",
         "is_from_composer": "true",
