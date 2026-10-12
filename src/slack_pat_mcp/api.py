@@ -22,7 +22,10 @@ def _post(method: str, data: dict, headers: dict = HEADERS) -> dict:
     resp.raise_for_status()
     body = resp.json()
     if not body.get("ok"):
-        raise RuntimeError(f"Slack {method}: {body.get('error', body)}")
+        if body.get("error") == "missing_scope" and headers is HEADERS and XOXC_TOKEN and D_COOKIE:
+            return _post(method, data, SESSION_HEADERS)
+        needed = f" (token needs scope: {body['needed']})" if body.get("needed") else ""
+        raise RuntimeError(f"Slack {method}: {body.get('error', body)}{needed}")
     return body
 
 

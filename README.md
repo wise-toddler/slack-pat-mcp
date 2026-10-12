@@ -38,6 +38,8 @@ Slack's drafts API rejects xoxp tokens, so drafts use your browser session. In `
 
 These are unofficial and stop working when you sign out of Slack in that browser.
 
+When set, they are also the fallback for any call where the xoxp token returns `missing_scope` (e.g. `set_status` without `users.profile:write`).
+
 ## Required Slack OAuth Scopes (User Token)
 
-channels:read, channels:history, groups:read, groups:history, im:read, im:history, im:write, mpim:read, mpim:history, mpim:write, chat:write, reactions:read, reactions:write, search:read, users:read, users:read.email, users.profile:read, usergroups:read
+channels:read, channels:history, groups:read, groups:history, im:read, im:history, im:write, mpim:read, mpim:history, mpim:write, chat:write, reactions:read, reactions:write, search:read, users:read, users:read.email, users.profile:read, users.profile:write, usergroups:read
