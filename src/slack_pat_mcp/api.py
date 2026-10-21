@@ -11,6 +11,9 @@ from .richtext import to_blocks
 
 BASE = "https://slack.com/api"
 
+# xoxp errors that the browser session can recover from: missing scopes, or a revoked/absent PAT
+FALLBACK_ERRORS = {"missing_scope", "token_revoked", "token_expired", "invalid_auth", "not_authed", "account_inactive", "not_allowed_token_type"}
+
 
 def _post(method: str, data: dict, headers: dict = HEADERS) -> dict:
     """POST to Slack API, retry once on 429, check response ok."""
@@ -22,7 +25,7 @@ def _post(method: str, data: dict, headers: dict = HEADERS) -> dict:
     resp.raise_for_status()
     body = resp.json()
     if not body.get("ok"):
-        if body.get("error") == "missing_scope" and headers is HEADERS and XOXC_TOKEN and D_COOKIE:
+        if body.get("error") in FALLBACK_ERRORS and headers is HEADERS and XOXC_TOKEN and D_COOKIE:
             return _post(method, data, SESSION_HEADERS)
         needed = f" (token needs scope: {body['needed']})" if body.get("needed") else ""
         raise RuntimeError(f"Slack {method}: {body.get('error', body)}{needed}")

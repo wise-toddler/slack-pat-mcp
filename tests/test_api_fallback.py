@@ -28,6 +28,13 @@ def test_missing_scope_falls_back_to_session():
     assert calls == [api.HEADERS, api.SESSION_HEADERS]
 
 
+def test_revoked_pat_falls_back_to_session():
+    calls = []
+    api.requests.post, api.XOXC_TOKEN, api.D_COOKIE = _fake_post(calls, {"ok": False, "error": "token_revoked"}), "xoxc-x", "xoxd-x"
+    assert api.conversations_list("public_channel")["via"] == "session"
+    assert calls == [api.HEADERS, api.SESSION_HEADERS]
+
+
 def test_no_fallback_without_keys_or_for_other_errors():
     calls = []
     api.requests.post, api.XOXC_TOKEN, api.D_COOKIE = _fake_post(calls, {"ok": False, "error": "missing_scope", "needed": "users.profile:write"}), "", ""

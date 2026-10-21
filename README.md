@@ -38,7 +38,7 @@ Slack's drafts API rejects xoxp tokens, so drafts use your browser session. In `
 
 These are unofficial and stop working when you sign out of Slack in that browser.
 
-When set, they are also the fallback for any call where the xoxp token returns `missing_scope` (e.g. `set_status` without `users.profile:write`).
+When set, they are also the fallback for any call where the xoxp token fails with a missing scope (e.g. `set_status` without `users.profile:write`) or an auth error (revoked/expired/unset token), so every tool keeps working on the browser session alone.
 
 ## Required Slack OAuth Scopes (User Token)
 
