@@ -52,6 +52,30 @@ def test_no_fallback_without_keys_or_for_other_errors():
     assert api.SESSION_HEADERS not in calls
 
 
+class _File:
+    def __init__(self, ctype, status=200):
+        self.headers, self.content, self.status_code, self.ok = {"Content-Type": ctype}, b"x", status, status < 400
+
+
+def test_download_bad_pat_falls_back_to_session():
+    """A bad PAT gets a 403 or Slack's HTML login page instead of the file; the session cookie gets the file."""
+    for pat_reply in (_File("text/html; charset=utf-8"), _File("text/html", 403)):
+        seen = []
+
+        def get(url, headers, timeout):
+            seen.append("Cookie" in headers)
+            return _File("image/png") if "Cookie" in headers else pat_reply
+        api.requests.get, api.XOXC_TOKEN, api.D_COOKIE = get, "xoxc-x", "xoxd-x"
+        assert api._get_file("https://files.slack.com/x.png", "image/png").headers["Content-Type"] == "image/png"
+        assert seen == [False, True]
+    api.XOXC_TOKEN = ""
+    try:
+        api._get_file("https://files.slack.com/x.png", "image/png")
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as e:
+        assert "HTTP 403" in str(e), e
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

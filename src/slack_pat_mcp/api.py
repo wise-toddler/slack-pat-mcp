@@ -1,6 +1,8 @@
 """Slack Web API wrapper using user token with form-encoded POST."""
 
 import json
+import os
+import tempfile
 import time
 import uuid
 
@@ -131,6 +133,34 @@ def files_list(channel: str = "", cursor: str = "", limit: int = 20) -> dict:
 def files_info(file_id: str) -> dict:
     """Get info about a file."""
     return _post("files.info", {"file": file_id})
+
+
+def _get_file(url: str, mimetype: str) -> requests.Response:
+    """GET a private file URL; Slack answers a bad token with 403 or its HTML login page, so retry with the browser session."""
+    for headers in ([HEADERS, SESSION_HEADERS] if XOXC_TOKEN and D_COOKIE else [HEADERS]):
+        resp = requests.get(url, headers={k: v for k, v in headers.items() if k != "Content-Type"}, timeout=60)
+        if resp.ok and (mimetype == "text/html" or "text/html" not in resp.headers.get("Content-Type", "")):
+            return resp
+    raise RuntimeError(f"file download failed (HTTP {resp.status_code} or Slack login page): no configured token can read this file")
+
+
+def files_download(file_id: str, dest_dir: str = "") -> dict:
+    """Save a file locally and return its path; small text files also return content."""
+    f = files_info(file_id)["file"]
+    url = f.get("url_private_download") or f.get("url_private")
+    if not url:
+        raise RuntimeError(f"{file_id} has no downloadable URL (mode={f.get('mode')})")
+    mimetype = f.get("mimetype", "")
+    resp = _get_file(url, mimetype)
+    folder = dest_dir or os.path.join(tempfile.gettempdir(), "slack-pat-mcp")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"{file_id}_{os.path.basename(f.get('name') or 'file')}")
+    with open(path, "wb") as out:
+        out.write(resp.content)
+    result = {"path": path, "name": f.get("name"), "mimetype": mimetype, "size": len(resp.content)}
+    if (mimetype.startswith("text/") or mimetype in ("application/json", "application/xml")) and len(resp.content) <= 100_000:
+        result["content"] = resp.content.decode("utf-8", errors="replace")
+    return result
 
 
 def files_delete(file_id: str) -> dict:

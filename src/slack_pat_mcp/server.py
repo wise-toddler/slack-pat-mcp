@@ -59,13 +59,14 @@ TOOLS = [
     },
     {
         "name": "slack_files",
-        "description": "File operations. Actions: list, info, upload, delete",
+        "description": "File operations. Actions: list, info, upload, delete, download. download saves a file (e.g. one attached to a message) locally and returns its path; text files also return content",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "enum": ["list", "info", "upload", "delete"]},
+                "action": {"type": "string", "enum": ["list", "info", "upload", "delete", "download"]},
                 "channel": {"type": "string", "description": "Channel ID (for list/upload)"},
-                "file_id": {"type": "string", "description": "File ID (for info/delete)"},
+                "file_id": {"type": "string", "description": "File ID F... (for info/delete/download)"},
+                "dest_dir": {"type": "string", "description": "Directory to save into (for download; default: system temp dir/slack-pat-mcp)"},
                 "content": {"type": "string", "description": "Text content to upload (for upload)"},
                 "filename": {"type": "string", "default": "file.txt", "description": "Filename (for upload)"},
                 "title": {"type": "string", "description": "File title (for upload)"},
@@ -128,8 +129,13 @@ def _resolve_mentions(text):
     return re.sub(r"<@(U[A-Z0-9]+)>", lambda m: f"<@{m.group(1)}> ({_user_cache.get(m.group(1), m.group(1))})", text)
 
 
+def _condense_attachment(a):
+    fields = {"title": a.get("title"), "text": a.get("text") or a.get("fallback"), "url": a.get("title_link") or a.get("from_url"), "service": a.get("service_name")}
+    return {k: v for k, v in fields.items() if v}
+
+
 def _condense_message(msg):
-    return {
+    m = {
         "ts": msg.get("ts"),
         "user": msg.get("user"),
         "text": _resolve_mentions(msg.get("text")),
@@ -137,6 +143,11 @@ def _condense_message(msg):
         "reply_count": msg.get("reply_count"),
         "thread_ts": msg.get("thread_ts"),
     }
+    if msg.get("files"):
+        m["files"] = [_condense_file(f) for f in msg["files"]]
+    if msg.get("attachments"):
+        m["attachments"] = [_condense_attachment(a) for a in msg["attachments"]]
+    return m
 
 
 def _condense_draft(d):
@@ -150,6 +161,7 @@ def _condense_file(f):
         "name": f.get("name"),
         "title": f.get("title"),
         "filetype": f.get("filetype"),
+        "mimetype": f.get("mimetype"),
         "size": f.get("size"),
         "user": f.get("user"),
         "channels": f.get("channels", []),
@@ -249,7 +261,9 @@ def handle_files(args):
     if action == "delete":
         api.files_delete(args["file_id"])
         return {"success": True}
-    return {"error": f"Unknown action: {action}. Valid: list, info, upload, delete"}
+    if action == "download":
+        return api.files_download(args["file_id"], args.get("dest_dir", ""))
+    return {"error": f"Unknown action: {action}. Valid: list, info, upload, delete, download"}
 
 
 def handle_users(args):
@@ -326,7 +340,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.9"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.10"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}

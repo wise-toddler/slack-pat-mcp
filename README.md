@@ -26,6 +26,7 @@ uvx slack-pat-mcp
 - **slack_channel** — list, list_dms, history, thread, open_dm
 - **slack_chat** — post, update, delete, react_add, react_remove
 - **slack_search** — search messages with Slack syntax
+- **slack_files** — list, info, upload, delete, download (saves a file locally, returns its path; text files also return content). Messages from history/thread include their `files` and `attachments`
 - **slack_users** — list, info, profile, usergroups, set_status
 - **slack_drafts** — create, list, update, delete; text is Slack mrkdwn (bold/italic/strike/code, lists, quotes, code blocks, links, mentions, emoji), converted to rich_text (needs browser session keys below)
 
