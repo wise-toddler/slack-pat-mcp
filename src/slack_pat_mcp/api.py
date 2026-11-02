@@ -168,20 +168,27 @@ def files_delete(file_id: str) -> dict:
     return _post("files.delete", {"file": file_id})
 
 
-def files_upload(channel: str, content: str, filename: str = "file.txt", title: str = "") -> dict:
-    """Upload text content as a file using v2 upload flow."""
+def files_upload(channel: str, content: str, filename: str = "file.txt", title: str = "", snippet_type: str = "", thread_ts: str = "", initial_comment: str = "") -> dict:
+    """Upload text content as a file, or as a snippet when snippet_type is set, using v2 upload flow."""
     content_bytes = content.encode("utf-8")
     # Step 1: Get upload URL
-    url_resp = _post("files.getUploadURLExternal", {"filename": filename, "length": len(content_bytes)})
+    url_data = {"filename": filename, "length": len(content_bytes)}
+    if snippet_type:
+        url_data["snippet_type"] = snippet_type
+    url_resp = _post("files.getUploadURLExternal", url_data)
     upload_url = url_resp["upload_url"]
     file_id = url_resp["file_id"]
     # Step 2: Upload content to URL
-    requests.post(upload_url, data=content_bytes, headers={"Content-Type": "application/octet-stream"}, timeout=30)
+    requests.post(upload_url, data=content_bytes, headers={"Content-Type": "application/octet-stream"}, timeout=30).raise_for_status()
     # Step 3: Complete upload
     files_data = json.dumps([{"id": file_id, "title": title or filename}])
     data = {"files": files_data}
     if channel:
         data["channel_id"] = channel
+    if thread_ts:
+        data["thread_ts"] = thread_ts
+    if initial_comment:
+        data["initial_comment"] = initial_comment
     return _post("files.completeUploadExternal", data)
 
 

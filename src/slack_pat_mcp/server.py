@@ -59,7 +59,7 @@ TOOLS = [
     },
     {
         "name": "slack_files",
-        "description": "File operations. Actions: list, info, upload, delete, download. download saves a file (e.g. one attached to a message) locally and returns its path; text files also return content",
+        "description": "File operations. Actions: list, info, upload, delete, download. upload posts text as a file, or as a code/text snippet with snippet_type (optionally in a thread, with a message). download saves a file (e.g. one attached to a message) locally and returns its path; text files also return content",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -70,6 +70,9 @@ TOOLS = [
                 "content": {"type": "string", "description": "Text content to upload (for upload)"},
                 "filename": {"type": "string", "default": "file.txt", "description": "Filename (for upload)"},
                 "title": {"type": "string", "description": "File title (for upload)"},
+                "snippet_type": {"type": "string", "description": "Make the upload a text snippet with this syntax, e.g. text, python, javascript, json, shell (for upload)"},
+                "thread_ts": {"type": "string", "description": "Post the upload as a reply in this thread; needs channel (for upload)"},
+                "initial_comment": {"type": "string", "description": "Message posted with the upload (for upload)"},
                 "cursor": {"type": "string", "description": "Pagination cursor"},
                 "limit": {"type": "integer", "default": 20},
             },
@@ -257,7 +260,8 @@ def handle_files(args):
     if action == "info":
         return _condense_file(api.files_info(args["file_id"]).get("file", {}))
     if action == "upload":
-        return api.files_upload(args.get("channel", ""), args["content"], args.get("filename", "file.txt"), args.get("title", ""))
+        return api.files_upload(args.get("channel", ""), args["content"], args.get("filename", "file.txt"), args.get("title", ""),
+                                args.get("snippet_type", ""), args.get("thread_ts", ""), args.get("initial_comment", ""))
     if action == "delete":
         api.files_delete(args["file_id"])
         return {"success": True}
@@ -340,7 +344,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.10"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.11"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}
