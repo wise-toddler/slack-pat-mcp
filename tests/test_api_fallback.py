@@ -1,4 +1,6 @@
-"""Checks the PAT -> browser-session fallback on missing_scope."""
+"""Checks the PAT -> browser-session fallback on missing_scope, and what chat calls send."""
+
+import json
 
 from slack_pat_mcp import api
 
@@ -50,6 +52,25 @@ def test_no_fallback_without_keys_or_for_other_errors():
     except RuntimeError as e:
         assert "channel_not_found" in str(e), e
     assert api.SESSION_HEADERS not in calls
+
+
+def test_post_and_update_send_rich_text_blocks():
+    """Labelled links go as rich_text link elements; a text-only chat.update on the session token rendered them raw."""
+    sent = []
+
+    def post(url, headers, data, timeout):
+        sent.append(data)
+        return _Resp({"ok": True})
+    api.requests.post = post
+    text = "see <https://github.com/emergentbase/experiments/pull/2822|experiments#2822> <@U0ALM4FNFJ7>"
+    api.chat_post("C1", text)
+    api.chat_update("C1", "1.2", text)
+    assert len(sent) == 2
+    for data in sent:
+        assert data["text"] == text
+        els = json.loads(data["blocks"])[0]["elements"][0]["elements"]
+        assert {"type": "link", "url": "https://github.com/emergentbase/experiments/pull/2822", "text": "experiments#2822"} in els, els
+        assert {"type": "user", "user_id": "U0ALM4FNFJ7"} in els, els
 
 
 class _File:

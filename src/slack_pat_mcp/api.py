@@ -60,16 +60,17 @@ def conversations_open(users: str) -> dict:
 
 
 def chat_post(channel: str, text: str, thread_ts: str = "") -> dict:
-    """Post a message to a channel or thread."""
-    data = {"channel": channel, "text": text}
+    """Post a message to a channel or thread; blocks carry the formatting, text is the notification fallback."""
+    data = {"channel": channel, "text": text, "blocks": json.dumps(to_blocks(text))}
     if thread_ts:
         data["thread_ts"] = thread_ts
     return _post("chat.postMessage", data)
 
 
 def chat_update(channel: str, ts: str, text: str) -> dict:
-    """Update an existing message."""
-    return _post("chat.update", {"channel": channel, "ts": ts, "text": text})
+    """Update an existing message; blocks carry the formatting, as in chat_post."""
+    # chat.update on the session token escapes <url|label> in text to &lt;...&gt;, so links only render via blocks
+    return _post("chat.update", {"channel": channel, "ts": ts, "text": text, "blocks": json.dumps(to_blocks(text))})
 
 
 def chat_delete(channel: str, ts: str) -> dict:

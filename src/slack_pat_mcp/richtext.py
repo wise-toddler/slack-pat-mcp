@@ -5,9 +5,11 @@ import re
 _LIST_ITEM = re.compile(r"^\s*(?:([•\-*])|\d+[.)])\s+(.*)$")
 _QUOTE = re.compile(r"^(?:>|&gt;) ?(.*)$")
 _INLINE = re.compile(
-    r"<(?P<link>https?://[^|>\s]+)(?:\|(?P<label>[^>]+))?>"
+    r"<(?P<link>(?:https?://|mailto:)[^|>\s]+)(?:\|(?P<label>[^>]+))?>"
     r"|<@(?P<user>[UW][A-Z0-9]+)(?:\|[^>]*)?>"
     r"|<#(?P<channel>C[A-Z0-9]+)(?:\|[^>]*)?>"
+    r"|<!(?P<broadcast>here|channel|everyone)(?:\|[^>]*)?>"
+    r"|<!subteam\^(?P<usergroup>S[A-Z0-9]+)(?:\|[^>]*)?>"
     r"|`(?P<code>[^`\n]+)`"
     r"|(?<![\w*])\*(?!\s)(?P<bold>[^*\n]+?)(?<!\s)\*(?![\w*])"
     r"|(?<![\w_])_(?!\s)(?P<italic>[^_\n]+?)(?<!\s)_(?![\w_])"
@@ -42,6 +44,10 @@ def _inline(text):
             out.append({"type": "user", "user_id": m["user"]})
         elif m["channel"]:
             out.append({"type": "channel", "channel_id": m["channel"]})
+        elif m["broadcast"]:
+            out.append({"type": "broadcast", "range": m["broadcast"]})
+        elif m["usergroup"]:
+            out.append({"type": "usergroup", "usergroup_id": m["usergroup"]})
         elif m["code"]:
             out.append({"type": "text", "text": _unescape(m["code"]), "style": {"code": True}})
         elif m["url"]:

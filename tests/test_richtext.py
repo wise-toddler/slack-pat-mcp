@@ -58,6 +58,13 @@ def test_inline_edge_cases():
     assert to_text(to_blocks("plain line\nsecond line")) == "plain line\nsecond line"
 
 
+def test_broadcast_usergroup_mailto():
+    """Common message markup that must survive now that posts go through to_blocks."""
+    assert to_blocks("<!here> ping <!subteam^S0123ABC|@oncall> or <mailto:a@b.co|mail>")[0]["elements"][0]["elements"] == [
+        {"type": "broadcast", "range": "here"}, _t(" ping "), {"type": "usergroup", "usergroup_id": "S0123ABC"},
+        _t(" or "), {"type": "link", "url": "mailto:a@b.co", "text": "mail"}]
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
