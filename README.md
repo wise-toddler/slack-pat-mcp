@@ -28,6 +28,7 @@ uvx slack-pat-mcp
 - **slack_search** — search messages with Slack syntax
 - **slack_files** — list, info, upload, delete, download. upload posts text as a snippet (`snippet_type` for syntax, e.g. python; optional `thread_ts` and `initial_comment`); download saves a file locally, returns its path (text files also return content). Messages from history/thread include their `files` and `attachments`
 - **slack_users** — list, info, profile, usergroups, set_status
+- **slack_canvas** — read (canvas as markdown, optional section ids; works on the browser session), create, edit (insert/replace/delete sections with markdown), lookup, delete. All but read use Slack's canvas API, which only accepts an xoxp PAT with `canvases:read`/`canvases:write`
 - **slack_drafts** — create, list, update, delete; text is Slack mrkdwn (bold/italic/strike/code, lists, quotes, code blocks, links, mentions, emoji), converted to rich_text (needs browser session keys below)
 
 ## Drafts (optional)
@@ -43,4 +44,4 @@ When set, they are also the fallback for any call where the xoxp token fails wit
 
 ## Required Slack OAuth Scopes (User Token)
 
-channels:read, channels:history, groups:read, groups:history, im:read, im:history, im:write, mpim:read, mpim:history, mpim:write, chat:write, reactions:read, reactions:write, search:read, users:read, users:read.email, users.profile:read, users.profile:write, usergroups:read
+channels:read, channels:history, groups:read, groups:history, im:read, im:history, im:write, mpim:read, mpim:history, mpim:write, chat:write, reactions:read, reactions:write, search:read, users:read, users:read.email, users.profile:read, users.profile:write, usergroups:read, canvases:read, canvases:write

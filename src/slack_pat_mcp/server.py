@@ -3,6 +3,7 @@ import json
 import re
 import sys
 from . import api
+from .canvas import html_to_markdown
 from .richtext import to_text
 
 _user_cache = {}
@@ -107,6 +108,26 @@ TOOLS = [
                 "text": {"type": "string", "description": "Draft text in Slack mrkdwn (for create/update)"},
                 "thread_ts": {"type": "string", "description": "Draft a thread reply (for create)"},
                 "draft_id": {"type": "string", "description": "Draft ID Dr... (for update/delete)"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "slack_canvas",
+        "description": "Slack canvases. Actions: read, create, edit, lookup, delete. read returns the canvas as markdown (with_sections=true adds section ids for edit) and works on the browser session. create/edit/lookup/delete use Slack's canvas API, which needs a valid xoxp PAT with canvases:read/canvases:write. Markdown is standard: # headings, **bold**, - lists, [text](url)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["read", "create", "edit", "lookup", "delete"]},
+                "canvas_id": {"type": "string", "description": "Canvas file ID F... (for read/edit/lookup/delete)"},
+                "with_sections": {"type": "boolean", "default": False, "description": "Also return [{id, type, text}] per block (for read)"},
+                "title": {"type": "string", "description": "Canvas title (for create)"},
+                "channel": {"type": "string", "description": "Channel ID to tab the new canvas in (for create)"},
+                "markdown": {"type": "string", "description": "Content (for create/edit)"},
+                "operation": {"type": "string", "enum": ["insert_at_end", "insert_at_start", "insert_after", "insert_before", "replace", "delete"], "description": "Edit operation; insert_after/insert_before/delete and section replace need section_id (for edit)"},
+                "section_id": {"type": "string", "description": "Section id temp:C:... from read with_sections or lookup (for edit)"},
+                "contains_text": {"type": "string", "description": "Find sections containing this text (for lookup)"},
+                "section_types": {"type": "string", "description": "Comma-separated: h1,h2,h3,any_header (for lookup)"},
             },
             "required": ["action"]
         }
@@ -293,6 +314,28 @@ def handle_users(args):
     return {"error": f"Unknown action: {action}. Valid: list, info, profile, usergroups, set_status"}
 
 
+def handle_canvas(args):
+    action = args["action"]
+    if action == "read":
+        f, html = api.canvas_html(args["canvas_id"])
+        markdown, sections = html_to_markdown(html)
+        r = {"id": f.get("id"), "title": f.get("title"), "markdown": markdown}
+        if args.get("with_sections"):
+            r["sections"] = sections
+        return r
+    if action == "create":
+        return api.canvases_create(args.get("title", ""), args.get("markdown", ""), args.get("channel", ""))
+    if action == "edit":
+        api.canvases_edit(args["canvas_id"], args["operation"], args.get("markdown", ""), args.get("section_id", ""))
+        return {"success": True}
+    if action == "lookup":
+        return api.canvases_sections_lookup(args["canvas_id"], args.get("contains_text", ""), args.get("section_types", ""))
+    if action == "delete":
+        api.canvases_delete(args["canvas_id"])
+        return {"success": True}
+    return {"error": f"Unknown action: {action}. Valid: read, create, edit, lookup, delete"}
+
+
 def handle_drafts(args):
     action = args["action"]
     if action == "create":
@@ -322,6 +365,8 @@ def handle_tool(name, args):
             return handle_users(args)
         if name == "slack_drafts":
             return handle_drafts(args)
+        if name == "slack_canvas":
+            return handle_canvas(args)
         return {"error": f"Unknown tool: {name}"}
     except KeyError as e:
         return {"error": f"Missing required argument: {e}"}
@@ -344,7 +389,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.12"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.13"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}

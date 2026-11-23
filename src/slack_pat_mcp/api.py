@@ -5,6 +5,7 @@ import os
 import tempfile
 import time
 import uuid
+from urllib.parse import urlparse
 
 import requests
 
@@ -30,6 +31,8 @@ def _post(method: str, data: dict, headers: dict = HEADERS) -> dict:
         if body.get("error") in FALLBACK_ERRORS and headers is HEADERS and XOXC_TOKEN and D_COOKIE:
             return _post(method, data, SESSION_HEADERS)
         needed = f" (token needs scope: {body['needed']})" if body.get("needed") else ""
+        if body.get("error") == "not_allowed_token_type" and headers is SESSION_HEADERS:
+            needed = " (the browser session token can't call this method; it needs a valid xoxp PAT with the method's scope)"
         raise RuntimeError(f"Slack {method}: {body.get('error', body)}{needed}")
     return body
 
@@ -136,11 +139,12 @@ def files_info(file_id: str) -> dict:
     return _post("files.info", {"file": file_id})
 
 
-def _get_file(url: str, mimetype: str) -> requests.Response:
-    """GET a private file URL; Slack answers a bad token with 403 or its HTML login page, so retry with the browser session."""
+def _get_file(url: str) -> requests.Response:
+    """GET a private file URL; Slack answers a bad token by redirecting to its login page, so retry with the browser session."""
     for headers in ([HEADERS, SESSION_HEADERS] if XOXC_TOKEN and D_COOKIE else [HEADERS]):
         resp = requests.get(url, headers={k: v for k, v in headers.items() if k != "Content-Type"}, timeout=60)
-        if resp.ok and (mimetype == "text/html" or "text/html" not in resp.headers.get("Content-Type", "")):
+        # canvases download as HTML too, so only a redirect off the file host marks the login page
+        if resp.ok and urlparse(resp.url).netloc == urlparse(url).netloc:
             return resp
     raise RuntimeError(f"file download failed (HTTP {resp.status_code} or Slack login page): no configured token can read this file")
 
@@ -152,7 +156,7 @@ def files_download(file_id: str, dest_dir: str = "") -> dict:
     if not url:
         raise RuntimeError(f"{file_id} has no downloadable URL (mode={f.get('mode')})")
     mimetype = f.get("mimetype", "")
-    resp = _get_file(url, mimetype)
+    resp = _get_file(url)
     folder = dest_dir or os.path.join(tempfile.gettempdir(), "slack-pat-mcp")
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{file_id}_{os.path.basename(f.get('name') or 'file')}")
@@ -256,3 +260,48 @@ def drafts_delete(draft_id: str) -> dict:
     """Delete a draft."""
     d = _get_draft(draft_id)
     return _session_post("drafts.delete", {"draft_id": draft_id, "client_last_updated_ts": _padded_ts(d["last_updated_ts"])})
+
+
+def canvas_html(canvas_id: str) -> tuple:
+    """Return (file info, HTML) of a canvas via its file download, which works on the browser session too."""
+    f = files_info(canvas_id)["file"]
+    if f.get("filetype") != "quip":
+        raise RuntimeError(f"{canvas_id} is not a canvas (filetype={f.get('filetype')})")
+    return f, _get_file(f.get("url_private_download") or f["url_private"]).text
+
+
+def _markdown(text: str) -> dict:
+    return {"type": "markdown", "markdown": text}
+
+
+def canvases_create(title: str, markdown: str, channel: str = "") -> dict:
+    """Create a canvas, optionally tabbed in a channel."""
+    data = {"title": title, "document_content": json.dumps(_markdown(markdown))}
+    if channel:
+        data["channel_id"] = channel
+    return _post("canvases.create", data)
+
+
+def canvases_edit(canvas_id: str, operation: str, markdown: str = "", section_id: str = "") -> dict:
+    """Apply one edit: insert_at_start/insert_at_end, insert_before/insert_after/replace/delete a section."""
+    change = {"operation": operation}
+    if markdown:
+        change["document_content"] = _markdown(markdown)
+    if section_id:
+        change["section_id"] = section_id
+    return _post("canvases.edit", {"canvas_id": canvas_id, "changes": json.dumps([change])})
+
+
+def canvases_sections_lookup(canvas_id: str, contains_text: str = "", section_types: str = "") -> dict:
+    """Find section ids by text and/or type (h1, h2, h3, any_header)."""
+    criteria = {}
+    if contains_text:
+        criteria["contains_text"] = contains_text
+    if section_types:
+        criteria["section_types"] = section_types.split(",")
+    return _post("canvases.sections.lookup", {"canvas_id": canvas_id, "criteria": json.dumps(criteria)})
+
+
+def canvases_delete(canvas_id: str) -> dict:
+    """Delete a canvas."""
+    return _post("canvases.delete", {"canvas_id": canvas_id})

@@ -73,28 +73,38 @@ def test_post_and_update_send_rich_text_blocks():
         assert {"type": "user", "user_id": "U0ALM4FNFJ7"} in els, els
 
 
+FILE_URL = "https://files.slack.com/files-pri/T1-F1/x.png"
+LOGIN_URL = "https://emergentlabsinc.slack.com/?redir=%2Ffiles-pri%2FT1-F1%2Fx.png"
+
+
 class _File:
-    def __init__(self, ctype, status=200):
-        self.headers, self.content, self.status_code, self.ok = {"Content-Type": ctype}, b"x", status, status < 400
+    def __init__(self, ctype, status=200, url=FILE_URL):
+        self.headers, self.content, self.status_code, self.ok, self.url = {"Content-Type": ctype}, b"x", status, status < 400, url
 
 
 def test_download_bad_pat_falls_back_to_session():
-    """A bad PAT gets a 403 or Slack's HTML login page instead of the file; the session cookie gets the file."""
-    for pat_reply in (_File("text/html; charset=utf-8"), _File("text/html", 403)):
+    """A bad PAT is redirected to Slack's login page (200 or 403); the session cookie gets the file."""
+    for pat_reply in (_File("text/html; charset=utf-8", url=LOGIN_URL), _File("text/html", 403, url=LOGIN_URL)):
         seen = []
 
         def get(url, headers, timeout):
             seen.append("Cookie" in headers)
             return _File("image/png") if "Cookie" in headers else pat_reply
         api.requests.get, api.XOXC_TOKEN, api.D_COOKIE = get, "xoxc-x", "xoxd-x"
-        assert api._get_file("https://files.slack.com/x.png", "image/png").headers["Content-Type"] == "image/png"
+        assert api._get_file(FILE_URL).headers["Content-Type"] == "image/png"
         assert seen == [False, True]
     api.XOXC_TOKEN = ""
     try:
-        api._get_file("https://files.slack.com/x.png", "image/png")
+        api._get_file(FILE_URL)
         raise AssertionError("expected RuntimeError")
     except RuntimeError as e:
         assert "HTTP 403" in str(e), e
+
+
+def test_html_from_the_file_host_is_the_file():
+    """Canvases download as HTML; v0.1.10-0.1.12 rejected them as a login page."""
+    api.requests.get, api.XOXC_TOKEN, api.D_COOKIE = (lambda url, headers, timeout: _File("text/html")), "xoxc-x", "xoxd-x"
+    assert api._get_file(FILE_URL).headers["Content-Type"] == "text/html"
 
 
 if __name__ == "__main__":
