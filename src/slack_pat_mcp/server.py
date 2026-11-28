@@ -341,8 +341,11 @@ def handle_drafts(args):
     if action == "create":
         return _condense_draft(api.drafts_create(args["channel"], args["text"], args.get("thread_ts", ""))["draft"])
     if action == "list":
-        drafts = api.drafts_list().get("drafts", [])
-        return {"drafts": [_condense_draft(d) for d in drafts if not d.get("is_deleted") and not d.get("is_sent")]}
+        data = api.drafts_list()
+        r = {"drafts": [_condense_draft(d) for d in data.get("drafts", []) if not d.get("is_deleted") and not d.get("is_sent")]}
+        if data.get("has_more"):
+            r["note"] = "Slack returned only the newest drafts and offers no paging"
+        return r
     if action == "update":
         return _condense_draft(api.drafts_update(args["draft_id"], args["text"])["draft"])
     if action == "delete":
@@ -389,7 +392,7 @@ def main():
             res = {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.13"}
+                "serverInfo": {"name": "slack-pat-mcp", "version": "0.1.14"}
             }
         elif method == "tools/list":
             res = {"tools": TOOLS}

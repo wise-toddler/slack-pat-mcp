@@ -219,16 +219,17 @@ def _padded_ts(ts: str) -> str:
 
 
 def drafts_list() -> dict:
-    """List the user's drafts (includes sent/deleted ones)."""
-    return _session_post("drafts.list", {})
+    """List the user's active drafts, newest first."""
+    # bare drafts.list returns the newest 10 rows incl. sent/deleted ones, and exposes no paging param, so ask for all active ones
+    return _session_post("drafts.list", {"is_active": "true", "limit": "1000"})
 
 
 def _get_draft(draft_id: str) -> dict:
-    """Find one draft by ID via drafts.list."""
+    """Find one active draft by ID via drafts.list."""
     for d in drafts_list().get("drafts", []):
         if d["id"] == draft_id:
             return d
-    raise RuntimeError(f"draft not found: {draft_id}")
+    raise RuntimeError(f"active draft not found: {draft_id}")
 
 
 def drafts_create(channel: str, text: str, thread_ts: str = "") -> dict:

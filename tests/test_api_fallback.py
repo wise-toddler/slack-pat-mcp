@@ -73,6 +73,19 @@ def test_post_and_update_send_rich_text_blocks():
         assert {"type": "user", "user_id": "U0ALM4FNFJ7"} in els, els
 
 
+def test_drafts_list_asks_for_all_active():
+    """Bare drafts.list gave the newest 10 rows incl. sent/deleted ones, so list came back empty and lookups missed real drafts."""
+    sent = []
+    many = [{"id": f"Dr{i}", "last_updated_ts": "1.5", "destinations": [{"channel_id": "D1"}]} for i in range(50)]
+
+    def post(url, headers, data, timeout):
+        sent.append(data)
+        return _Resp({"ok": True, "drafts": many, "has_more": False})
+    api.requests.post, api.XOXC_TOKEN, api.D_COOKIE = post, "xoxc-x", "xoxd-x"
+    assert api._get_draft("Dr42")["id"] == "Dr42"
+    assert sent[0]["is_active"] == "true" and int(sent[0]["limit"]) >= 100, sent[0]
+
+
 FILE_URL = "https://files.slack.com/files-pri/T1-F1/x.png"
 LOGIN_URL = "https://emergentlabsinc.slack.com/?redir=%2Ffiles-pri%2FT1-F1%2Fx.png"
 
